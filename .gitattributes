@@ -1,0 +1,11 @@
+# Normalize text files to LF in both the repository and working tree.
+* text=auto eol=lf
+
+# Keep binary dependencies and assets out of line-ending conversion.
+*.dll binary
+*.lib binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.pdf binary

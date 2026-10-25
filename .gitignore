@@ -1,0 +1,30 @@
+# Generated build output
+build/
+
+# Generated C++ compilation database
+/compile_commands.json
+
+# Visual Studio user and workspace files
+
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+
+# Temporary and diagnostic files
+*.log
+*.tlog
+*.tmp
+*.aps
+*.ncb
+*.sdf
+*.opensdf
+*.cache
+ipch/
+
+# Test output
+TestResults/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
