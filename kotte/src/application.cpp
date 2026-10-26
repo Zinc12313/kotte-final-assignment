@@ -102,6 +102,24 @@ namespace kotte
         }
     }
 
+    void Application::reset_round() {
+        map_ = make_room(200, 120, random_);
+
+        spatial_grid_ = SpatialGrid{
+            Vector2{ static_cast<float>(map_.width()) * tile_size_, static_cast<float>(map_.height()) * tile_size_ },
+            spatial_cell_size_
+        };
+
+        enemy_handles_.clear();
+        active_bomb_handles_.clear();
+        destroy_entity_requests_.clear();
+        active_blasts_.clear();
+
+        populate_initial_world();
+        round_state_ = RoundState::playing;
+        update_camera();
+    }
+
     const Entity& Application::player() const noexcept {
         return *entities_.try_get(player_handle_);
     }
@@ -127,26 +145,43 @@ namespace kotte
             request_exit();
         }
 
-        update_player_input(dt);
-        update_enemies(dt);
-        update_bombs(dt);
-
-        // Week 6 Structural Mutation Phase: Execute deferred removals
-        apply_entity_destructions();
-
-        // Update active blast visual timers
-        for (auto& blast : active_blasts_) {
-            blast.remaining_seconds -= dt;
+        if (IsKeyPressed(KEY_R)) {
+            reset_round();
         }
-        std::erase_if(active_blasts_, [](const BlastEffect& b) {
-            return b.remaining_seconds <= 0.0f;
-            });
+
+        update_round_state();
+
+        if (round_state_ == RoundState::playing) {
+            update_player_input(dt);
+            update_enemies(dt);
+            update_bombs(dt);
+
+            apply_entity_destructions();
+
+            for (auto& blast : active_blasts_) {
+                blast.remaining_seconds -= dt;
+            }
+            std::erase_if(active_blasts_, [](const BlastEffect& b) {
+                return b.remaining_seconds <= 0.0f;
+                });
+        }
 
         update_camera();
     }
 
+    void Application::update_round_state() {
+        if (round_state_ != RoundState::playing) return;
+
+        if (player().is_dead) {
+            round_state_ = RoundState::lost;
+        }
+        else if (enemy_handles_.empty()) {
+            round_state_ = RoundState::won;
+        }
+    }
+
     void Application::update_player_input(float dt) {
-        if (player().is_dead) return; // Stop input if dead
+        if (player().is_dead) return;
 
         constexpr float player_speed = 200.0f;
         float move_x = 0.0f;
@@ -169,7 +204,6 @@ namespace kotte
     void Application::try_place_bomb() {
         if (player().is_dead) return;
 
-        // Enforce 1 active bomb per player
         for (const EntityHandle h : active_bomb_handles_) {
             const Entity* bomb = entities_.try_get(h);
             if (bomb && bomb->owner_slot == player_handle_.slot) {
@@ -177,7 +211,6 @@ namespace kotte
             }
         }
 
-        // Align bomb to nearest tile center
         const Vector2 p_pos = player().world_position;
         const float snap_x = (std::floor(p_pos.x / tile_size_) + 0.5f) * tile_size_;
         const float snap_y = (std::floor(p_pos.y / tile_size_) + 1.0f) * tile_size_;
@@ -206,20 +239,17 @@ namespace kotte
     }
 
     void Application::detonate_bomb(EntityHandle bomb_handle, const Entity& bomb) {
-        // Request destruction of the bomb itself
         destroy_entity_requests_.push_back({ bomb_handle });
 
         const Vector2 center = bomb.world_position;
         constexpr float blast_range = 3.0f * tile_size_;
 
-        // Create cross blast zone
         const Rectangle horizontal_blast{ center.x - blast_range, center.y - (tile_size_ * 0.5f), blast_range * 2.0f, tile_size_ };
         const Rectangle vertical_blast{ center.x - (tile_size_ * 0.5f), center.y - blast_range, tile_size_, blast_range * 2.0f };
 
         active_blasts_.push_back(BlastEffect{ .bounds = horizontal_blast });
         active_blasts_.push_back(BlastEffect{ .bounds = vertical_blast });
 
-        // Query spatial grid for blast targets
         const SpatialQuery q1 = spatial_grid_.query(horizontal_blast);
         const SpatialQuery q2 = spatial_grid_.query(vertical_blast);
 
@@ -245,7 +275,6 @@ namespace kotte
         }
     }
 
-    // Week 6 Core: Apply deferred destructions safely
     void Application::apply_entity_destructions() {
         for (const auto& request : destroy_entity_requests_) {
             Entity* entity = entities_.try_get(request.entity);
@@ -253,14 +282,12 @@ namespace kotte
                 continue;
             }
 
-            // Remove from spatial grid using full world bounds before clearing memory
             const Rectangle world_bounds = entity_world_bounds(*entity);
             spatial_grid_.remove(request.entity, world_bounds);
 
             (void)entities_.destroy(request.entity);
         }
 
-        // Clean stale handles from role lists
         std::erase_if(enemy_handles_, [this](EntityHandle handle) {
             return !entities_.contains(handle);
             });
@@ -294,6 +321,24 @@ namespace kotte
             const Entity* candidate = entities_.try_get(candidate_handle);
             if (!candidate || !is_solid(candidate->kind)) {
                 continue;
+            }
+
+            // Owner escape check for bombs
+            if (candidate->kind == EntityKind::bomb && moving_handle.slot == candidate->owner_slot) {
+                const Entity* moving_entity = entities_.try_get(moving_handle);
+                if (moving_entity) {
+                    const float prev_dist_sq =
+                        (moving_entity->world_position.x - candidate->world_position.x) * (moving_entity->world_position.x - candidate->world_position.x) +
+                        (moving_entity->world_position.y - candidate->world_position.y) * (moving_entity->world_position.y - candidate->world_position.y);
+                    const float prop_dist_sq =
+                        (proposed_position.x - candidate->world_position.x) * (proposed_position.x - candidate->world_position.x) +
+                        (proposed_position.y - candidate->world_position.y) * (proposed_position.y - candidate->world_position.y);
+
+                    // Allow movement if moving away from or maintaining distance from own bomb
+                    if (prop_dist_sq >= prev_dist_sq) {
+                        continue;
+                    }
+                }
             }
 
             if (CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(*candidate))) {
@@ -402,7 +447,6 @@ namespace kotte
 
         renderer_.clear();
 
-        // Draw active blast visual flashes (Ground layer)
         for (const auto& blast : active_blasts_) {
             const Vector2 screen_pos = camera_.world_to_screen(Vector2{ blast.bounds.x, blast.bounds.y });
             DrawRectangleRec(
@@ -446,17 +490,21 @@ namespace kotte
         renderer_.sort();
         renderer_.execute();
 
-        // Screen HUD
         DrawFPS(GetScreenWidth() - 100, 2);
-        DrawText(TextFormat("entities alive: %zu", entities_.size()), 10, 10, 20, RAYWHITE);
-        DrawText(TextFormat("active bombs: %zu / 1", active_bomb_handles_.size()), 10, 34, 20, YELLOW);
+        DrawText(TextFormat("Entities Alive: %zu", entities_.size()), 10, 10, 20, RAYWHITE);
+        DrawText(TextFormat("Enemies Remaining: %zu", enemy_handles_.size()), 10, 34, 20, ORANGE);
         DrawText(TextFormat("Player Lives: %i", player().lives), 10, 58, 20, player().is_dead ? RED : GREEN);
 
-        if (player().is_dead) {
-            DrawText("GAME OVER - YOU DIED", window_.width() / 2 - 150, window_.height() / 2 - 20, 30, RED);
+        if (round_state_ == RoundState::won) {
+            DrawText("VICTORY! ALL ENEMIES DEFEATED", window_.width() / 2 - 200, window_.height() / 2 - 40, 30, GREEN);
+            DrawText("Press [R] to Restart", window_.width() / 2 - 100, window_.height() / 2 + 10, 20, LIGHTGRAY);
+        }
+        else if (round_state_ == RoundState::lost) {
+            DrawText("GAME OVER - DEFEATED", window_.width() / 2 - 150, window_.height() / 2 - 40, 30, RED);
+            DrawText("Press [R] to Restart", window_.width() / 2 - 100, window_.height() / 2 + 10, 20, LIGHTGRAY);
         }
 
-        DrawText("WASD: move | Space: place bomb | Q: quit", 10, window_.height() - 30, 20, LIGHTGRAY);
+        DrawText("WASD: move | Space: place bomb | R: restart | Q: quit", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
     void Application::request_exit() noexcept {

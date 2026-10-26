@@ -15,7 +15,8 @@ namespace kotte
         player,
         crate,
         bomb,
-        enemy
+        enemy,
+        powerup
     };
 
     struct Entity final {
@@ -24,9 +25,8 @@ namespace kotte
         Vector2 heading{ 0.0f, 1.0f };
         bool alert{ false };
         float fuse_seconds{ 2.0f };
-        std::size_t owner_slot{ 0 }; // Links bomb to player slot
+        std::size_t owner_slot{ 0 };
 
-        // Player damage & death fields
         int lives{ 3 };
         bool is_dead{ false };
     };

@@ -1,5 +1,3 @@
-//application.hpp
-
 #pragma once
 
 #include "kotte/camera.hpp"
@@ -18,6 +16,12 @@
 
 namespace kotte
 {
+    enum class RoundState : std::uint8_t {
+        playing,
+        won,
+        lost
+    };
+
     struct DestroyEntityRequest final {
         EntityHandle entity{};
     };
@@ -43,6 +47,7 @@ namespace kotte
         void update_player_input(float dt);
         void update_enemies(float dt);
         void update_bombs(float dt);
+        void update_round_state();
         void apply_entity_destructions();
         void try_place_bomb();
         void detonate_bomb(EntityHandle bomb_handle, const Entity& bomb);
@@ -50,8 +55,10 @@ namespace kotte
 
         void try_move_player(float delta_x, float delta_y);
         [[nodiscard]] bool entity_movement_is_blocked(EntityHandle moving_handle, Vector2 proposed_position);
+        void check_powerup_collisions();
         void update_camera();
         void populate_initial_world();
+        void reset_round();
         void request_exit() noexcept;
 
         [[nodiscard]] const Entity& player() const noexcept;
@@ -63,6 +70,8 @@ namespace kotte
         std::uint64_t seed_{};
         bool exit_requested_{ false };
         Color background_color_{ 0x18, 0x18, 0x18, 0xff };
+        RoundState round_state_{ RoundState::playing };
+        float player_blast_range_tiles_{ 3.0f };
 
         EntityHandle player_handle_{};
         EntityStore entities_{};

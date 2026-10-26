@@ -1,6 +1,3 @@
-//enity.cpp
-
-
 #include "kotte/entity.hpp"
 
 namespace kotte
@@ -15,6 +12,8 @@ namespace kotte
             return 20.0f;
         case EntityKind::enemy:
             return 28.0f;
+        case EntityKind::powerup:
+            return 22.0f;
         }
         return 20.0f;
     }
@@ -29,6 +28,8 @@ namespace kotte
             return 24.0f;
         case EntityKind::enemy:
             return 36.0f;
+        case EntityKind::powerup:
+            return 22.0f;
         }
         return 20.0f;
     }
@@ -43,6 +44,8 @@ namespace kotte
             return 0.8f;
         case EntityKind::enemy:
             return 0.25f;
+        case EntityKind::powerup:
+            return 0.5f;
         }
         return 0.0f;
     }
@@ -57,17 +60,22 @@ namespace kotte
             return Color{ 0x30, 0x30, 0x30, 0xff };
         case EntityKind::enemy:
             return Color{ 0xc4, 0x3b, 0x3b, 0xff };
+        case EntityKind::powerup:
+            return Color{ 0x61, 0xaf, 0xef, 0xff }; // Bright Cyan/Blue for powerups
         }
         return WHITE;
     }
 
-    bool is_solid(EntityKind kind) noexcept {
-        return kind != EntityKind::bomb;
+    bool is_solid([[maybe_unused]] EntityKind kind) noexcept {
+        if (kind == EntityKind::powerup) {
+            return false;
+        }
+        return true;
     }
 
     Rectangle entity_collision_bounds(const Entity& entity) noexcept {
         const float width = entity_width(entity.kind);
-        const float foot_height = 16.0f;
+        const float foot_height = (entity.kind == EntityKind::powerup) ? entity_height(entity.kind) : 16.0f;
         return Rectangle{
             entity.world_position.x - (width * 0.5f),
             entity.world_position.y - foot_height,
