@@ -1,3 +1,4 @@
+//camera.hpp
 #pragma once
 
 #include <raylib.h>

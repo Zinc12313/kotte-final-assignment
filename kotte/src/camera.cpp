@@ -1,3 +1,5 @@
+//camera.cpp
+
 #include "kotte/camera.hpp"
 
 namespace kotte

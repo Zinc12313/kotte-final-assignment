@@ -1,3 +1,5 @@
+//renderer.cpp
+
 #include "kotte/renderer.hpp"
 
 #include <algorithm>

@@ -146,6 +146,8 @@ namespace kotte
     }
 
     void Application::update_player_input(float dt) {
+        if (player().is_dead) return; // Stop input if dead
+
         constexpr float player_speed = 200.0f;
         float move_x = 0.0f;
         float move_y = 0.0f;
@@ -165,6 +167,8 @@ namespace kotte
     }
 
     void Application::try_place_bomb() {
+        if (player().is_dead) return;
+
         // Enforce 1 active bomb per player
         for (const EntityHandle h : active_bomb_handles_) {
             const Entity* bomb = entities_.try_get(h);
@@ -223,13 +227,19 @@ namespace kotte
         targets.insert(targets.end(), q2.entity_handles.begin(), q2.entity_handles.end());
 
         for (const EntityHandle target_handle : targets) {
-            const Entity* target = entities_.try_get(target_handle);
+            Entity* target = entities_.try_get(target_handle);
             if (!target || target_handle == bomb_handle) continue;
 
             const Rectangle bounds = entity_collision_bounds(*target);
             if (CheckCollisionRecs(horizontal_blast, bounds) || CheckCollisionRecs(vertical_blast, bounds)) {
                 if (target->kind == EntityKind::crate || target->kind == EntityKind::enemy) {
                     destroy_entity_requests_.push_back({ target_handle });
+                }
+                else if (target->kind == EntityKind::player) {
+                    target->lives--;
+                    if (target->lives <= 0) {
+                        target->is_dead = true;
+                    }
                 }
             }
         }
@@ -296,6 +306,8 @@ namespace kotte
 
     void Application::try_move_player(float delta_x, float delta_y) {
         Entity& p = player();
+        if (p.is_dead) return;
+
         const Rectangle old_bounds = entity_world_bounds(p);
 
         if (delta_x != 0.0f) {
@@ -438,6 +450,12 @@ namespace kotte
         DrawFPS(GetScreenWidth() - 100, 2);
         DrawText(TextFormat("entities alive: %zu", entities_.size()), 10, 10, 20, RAYWHITE);
         DrawText(TextFormat("active bombs: %zu / 1", active_bomb_handles_.size()), 10, 34, 20, YELLOW);
+        DrawText(TextFormat("Player Lives: %i", player().lives), 10, 58, 20, player().is_dead ? RED : GREEN);
+
+        if (player().is_dead) {
+            DrawText("GAME OVER - YOU DIED", window_.width() / 2 - 150, window_.height() / 2 - 20, 30, RED);
+        }
+
         DrawText("WASD: move | Space: place bomb | Q: quit", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 

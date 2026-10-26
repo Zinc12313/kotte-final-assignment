@@ -1,3 +1,6 @@
+//enity.cpp
+
+
 #include "kotte/entity.hpp"
 
 namespace kotte

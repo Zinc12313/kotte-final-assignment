@@ -1,3 +1,5 @@
+//application.hpp
+
 #pragma once
 
 #include "kotte/camera.hpp"

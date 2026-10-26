@@ -1,3 +1,5 @@
+//spatial_grid.cpp
+
 #include "kotte/spatial_grid.hpp"
 
 #include <algorithm>

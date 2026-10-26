@@ -25,6 +25,10 @@ namespace kotte
         bool alert{ false };
         float fuse_seconds{ 2.0f };
         std::size_t owner_slot{ 0 }; // Links bomb to player slot
+
+        // Player damage & death fields
+        int lives{ 3 };
+        bool is_dead{ false };
     };
 
     [[nodiscard]] float entity_width(EntityKind kind) noexcept;

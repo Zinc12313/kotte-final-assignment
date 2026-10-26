@@ -1,3 +1,5 @@
+//spatial_grid.hpp
+
 #pragma once
 
 #include "kotte/entity_store.hpp"

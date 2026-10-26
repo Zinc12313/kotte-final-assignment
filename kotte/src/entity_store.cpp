@@ -1,3 +1,5 @@
+//entity_store.cpp
+
 #include "kotte/entity_store.hpp"
 
 namespace kotte
