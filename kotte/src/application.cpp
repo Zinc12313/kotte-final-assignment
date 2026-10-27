@@ -225,7 +225,8 @@ namespace kotte
             .kind = EntityKind::bomb,
             .world_position = Vector2{ snap_x, snap_y },
             .fuse_seconds = 2.0f,
-            .owner_slot = player_handle_.slot
+            .owner_slot = player_handle_.slot,
+            .blast_range_tiles = player_blast_range_tiles_ // Locks current blast range
             });
 
         spatial_grid_.insert(bomb_handle, entity_world_bounds(*entities_.try_get(bomb_handle)));
@@ -248,7 +249,7 @@ namespace kotte
         destroy_entity_requests_.push_back({ bomb_handle });
 
         const Vector2 center = bomb.world_position;
-        const float blast_range = player_blast_range_tiles_ * tile_size_;
+        const float blast_range = bomb.blast_range_tiles * tile_size_;
 
         const Rectangle horizontal_blast{ center.x - blast_range, center.y - (tile_size_ * 0.5f), blast_range * 2.0f, tile_size_ };
         const Rectangle vertical_blast{ center.x - (tile_size_ * 0.5f), center.y - blast_range, tile_size_, blast_range * 2.0f };
