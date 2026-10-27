@@ -114,6 +114,7 @@ namespace kotte
         active_bomb_handles_.clear();
         destroy_entity_requests_.clear();
         active_blasts_.clear();
+        player_blast_range_tiles_ = 3.0f;
 
         populate_initial_world();
         round_state_ = RoundState::playing;
@@ -155,6 +156,7 @@ namespace kotte
             update_player_input(dt);
             update_enemies(dt);
             update_bombs(dt);
+            check_powerup_collisions();
 
             apply_entity_destructions();
 
@@ -204,11 +206,15 @@ namespace kotte
     void Application::try_place_bomb() {
         if (player().is_dead) return;
 
+        std::size_t player_bomb_count = 0;
         for (const EntityHandle h : active_bomb_handles_) {
             const Entity* bomb = entities_.try_get(h);
             if (bomb && bomb->owner_slot == player_handle_.slot) {
-                return;
+                ++player_bomb_count;
             }
+        }
+        if (player_bomb_count >= 3) {
+            return;
         }
 
         const Vector2 p_pos = player().world_position;
@@ -242,7 +248,7 @@ namespace kotte
         destroy_entity_requests_.push_back({ bomb_handle });
 
         const Vector2 center = bomb.world_position;
-        constexpr float blast_range = 3.0f * tile_size_;
+        const float blast_range = player_blast_range_tiles_ * tile_size_;
 
         const Rectangle horizontal_blast{ center.x - blast_range, center.y - (tile_size_ * 0.5f), blast_range * 2.0f, tile_size_ };
         const Rectangle vertical_blast{ center.x - (tile_size_ * 0.5f), center.y - blast_range, tile_size_, blast_range * 2.0f };
@@ -256,14 +262,31 @@ namespace kotte
         std::vector<EntityHandle> targets = q1.entity_handles;
         targets.insert(targets.end(), q2.entity_handles.begin(), q2.entity_handles.end());
 
+        std::uniform_real_distribution<float> dist_01(0.0f, 1.0f);
+
         for (const EntityHandle target_handle : targets) {
             Entity* target = entities_.try_get(target_handle);
-            if (!target || target_handle == bomb_handle) continue;
+            if (!target) continue;
 
             const Rectangle bounds = entity_collision_bounds(*target);
             if (CheckCollisionRecs(horizontal_blast, bounds) || CheckCollisionRecs(vertical_blast, bounds)) {
-                if (target->kind == EntityKind::crate || target->kind == EntityKind::enemy) {
+                if (target->kind == EntityKind::enemy) {
                     destroy_entity_requests_.push_back({ target_handle });
+                }
+                else if (target->kind == EntityKind::crate) {
+                    destroy_entity_requests_.push_back({ target_handle });
+
+                    if (dist_01(random_) < 0.75f) {
+                        const EntityHandle powerup_handle = entities_.spawn(Entity{
+                            .kind = EntityKind::powerup,
+                            .world_position = target->world_position
+                            });
+                        spatial_grid_.insert(powerup_handle, entity_world_bounds(*entities_.try_get(powerup_handle)));
+                    }
+                }
+                else if (target->kind == EntityKind::bomb && target_handle != bomb_handle) {
+                    // Extension #2: Chain Reaction - instantly detonate other bombs caught in blast
+                    target->fuse_seconds = 0.0f;
                 }
                 else if (target->kind == EntityKind::player) {
                     target->lives--;
@@ -323,7 +346,6 @@ namespace kotte
                 continue;
             }
 
-            // Owner escape check for bombs
             if (candidate->kind == EntityKind::bomb && moving_handle.slot == candidate->owner_slot) {
                 const Entity* moving_entity = entities_.try_get(moving_handle);
                 if (moving_entity) {
@@ -334,7 +356,6 @@ namespace kotte
                         (proposed_position.x - candidate->world_position.x) * (proposed_position.x - candidate->world_position.x) +
                         (proposed_position.y - candidate->world_position.y) * (proposed_position.y - candidate->world_position.y);
 
-                    // Allow movement if moving away from or maintaining distance from own bomb
                     if (prop_dist_sq >= prev_dist_sq) {
                         continue;
                     }
@@ -347,6 +368,24 @@ namespace kotte
         }
 
         return false;
+    }
+
+    void Application::check_powerup_collisions() {
+        const Entity& p = player();
+        if (p.is_dead) return;
+
+        const Rectangle player_bounds = entity_collision_bounds(p);
+        const SpatialQuery query = spatial_grid_.query(player_bounds);
+
+        for (const EntityHandle handle : query.entity_handles) {
+            Entity* entity = entities_.try_get(handle);
+            if (!entity || entity->kind != EntityKind::powerup) continue;
+
+            if (CheckCollisionRecs(player_bounds, entity_collision_bounds(*entity))) {
+                player_blast_range_tiles_ += 1.0f;
+                destroy_entity_requests_.push_back({ handle });
+            }
+        }
     }
 
     void Application::try_move_player(float delta_x, float delta_y) {
@@ -479,7 +518,7 @@ namespace kotte
             RenderCommand command{
                 .screen_bounds = screen_bounds,
                 .color = draw_color,
-                .layer = (entity->kind == EntityKind::bomb) ? RenderLayer::ground : RenderLayer::world,
+                .layer = (entity->kind == EntityKind::bomb || entity->kind == EntityKind::powerup) ? RenderLayer::ground : RenderLayer::world,
                 .depth = entity->world_position.y,
                 .roundness = entity_roundness(*entity)
             };
@@ -491,9 +530,18 @@ namespace kotte
         renderer_.execute();
 
         DrawFPS(GetScreenWidth() - 100, 2);
-        DrawText(TextFormat("Entities Alive: %zu", entities_.size()), 10, 10, 20, RAYWHITE);
+
+        std::size_t current_player_bombs = 0;
+        for (const EntityHandle h : active_bomb_handles_) {
+            const Entity* bomb = entities_.try_get(h);
+            if (bomb && bomb->owner_slot == player_handle_.slot) {
+                ++current_player_bombs;
+            }
+        }
+
+        DrawText(TextFormat("Active Bombs: %zu / 3", current_player_bombs), 10, 10, 20, YELLOW);
         DrawText(TextFormat("Enemies Remaining: %zu", enemy_handles_.size()), 10, 34, 20, ORANGE);
-        DrawText(TextFormat("Player Lives: %i", player().lives), 10, 58, 20, player().is_dead ? RED : GREEN);
+        DrawText(TextFormat("Player Lives: %i | Blast Range: %.0f", player().lives, player_blast_range_tiles_), 10, 58, 20, player().is_dead ? RED : GREEN);
 
         if (round_state_ == RoundState::won) {
             DrawText("VICTORY! ALL ENEMIES DEFEATED", window_.width() / 2 - 200, window_.height() / 2 - 40, 30, GREEN);
