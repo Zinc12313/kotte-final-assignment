@@ -1,4 +1,5 @@
 #include "kotte/application.hpp"
+#include "kotte/enemy_chaser.hpp"
 
 #include <raylib.h>
 #include <cmath>
@@ -77,8 +78,11 @@ namespace kotte
                 if (dist_01(random_) < 0.18f) {
                     const float kind_roll = dist_01(random_);
                     EntityKind kind = EntityKind::crate;
-                    if (kind_roll < 0.25f) {
+                    if (kind_roll < 0.12f) {
                         kind = EntityKind::enemy;
+                    }
+                    else if (kind_roll < 0.22f) {
+                        kind = EntityKind::enemy_chaser; // Spawns the 2nd behavior chaser
                     }
 
                     const Vector2 pos{
@@ -94,7 +98,7 @@ namespace kotte
 
                     spatial_grid_.insert(handle, entity_world_bounds(*entities_.try_get(handle)));
 
-                    if (kind == EntityKind::enemy) {
+                    if (kind == EntityKind::enemy || kind == EntityKind::enemy_chaser) {
                         enemy_handles_.push_back(handle);
                     }
                 }
@@ -226,7 +230,7 @@ namespace kotte
             .world_position = Vector2{ snap_x, snap_y },
             .fuse_seconds = 2.0f,
             .owner_slot = player_handle_.slot,
-            .blast_range_tiles = player_blast_range_tiles_ // Locks current blast range
+            .blast_range_tiles = player_blast_range_tiles_
             });
 
         spatial_grid_.insert(bomb_handle, entity_world_bounds(*entities_.try_get(bomb_handle)));
@@ -271,7 +275,7 @@ namespace kotte
 
             const Rectangle bounds = entity_collision_bounds(*target);
             if (CheckCollisionRecs(horizontal_blast, bounds) || CheckCollisionRecs(vertical_blast, bounds)) {
-                if (target->kind == EntityKind::enemy) {
+                if (target->kind == EntityKind::enemy || target->kind == EntityKind::enemy_chaser) {
                     destroy_entity_requests_.push_back({ target_handle });
                 }
                 else if (target->kind == EntityKind::crate) {
@@ -286,7 +290,6 @@ namespace kotte
                     }
                 }
                 else if (target->kind == EntityKind::bomb && target_handle != bomb_handle) {
-                    // Extension #2: Chain Reaction - instantly detonate other bombs caught in blast
                     target->fuse_seconds = 0.0f;
                 }
                 else if (target->kind == EntityKind::player) {
@@ -414,34 +417,42 @@ namespace kotte
     }
 
     void Application::update_enemies(float dt) {
-        constexpr float enemy_speed = 70.0f;
         const Vector2 player_pos = player().world_position;
 
         for (const EntityHandle enemy_handle : enemy_handles_) {
             Entity* enemy = entities_.try_get(enemy_handle);
             if (!enemy) continue;
 
-            const Vector2 to_player{
-                player_pos.x - enemy->world_position.x,
-                player_pos.y - enemy->world_position.y
-            };
-            const float dist_sqr = (to_player.x * to_player.x) + (to_player.y * to_player.y);
-            const float detection_radius = enemy->alert ? 320.0f : 240.0f;
-            enemy->alert = (dist_sqr < (detection_radius * detection_radius));
-
-            const Vector2 proposed_pos{
-                enemy->world_position.x + (enemy->heading.x * enemy_speed * dt),
-                enemy->world_position.y + (enemy->heading.y * enemy_speed * dt)
-            };
-
-            if (entity_movement_is_blocked(enemy_handle, proposed_pos)) {
-                enemy->heading = turn_right(enemy->heading);
+            if (enemy->kind == EntityKind::enemy_chaser) {
+                // Extension #9: Chaser Enemy Behavior
+                update_chaser_enemy(dt, enemy_handle, player_pos, spatial_grid_, entities_,
+                    [this](EntityHandle h, Vector2 pos) { return entity_movement_is_blocked(h, pos); });
             }
             else {
-                const Rectangle old_bounds = entity_world_bounds(*enemy);
-                enemy->world_position = proposed_pos;
-                const Rectangle new_bounds = entity_world_bounds(*enemy);
-                spatial_grid_.update(enemy_handle, old_bounds, new_bounds);
+                // Original Standard Patroller AI
+                constexpr float enemy_speed = 70.0f;
+                const Vector2 to_player{
+                    player_pos.x - enemy->world_position.x,
+                    player_pos.y - enemy->world_position.y
+                };
+                const float dist_sqr = (to_player.x * to_player.x) + (to_player.y * to_player.y);
+                const float detection_radius = enemy->alert ? 320.0f : 240.0f;
+                enemy->alert = (dist_sqr < (detection_radius * detection_radius));
+
+                const Vector2 proposed_pos{
+                    enemy->world_position.x + (enemy->heading.x * enemy_speed * dt),
+                    enemy->world_position.y + (enemy->heading.y * enemy_speed * dt)
+                };
+
+                if (entity_movement_is_blocked(enemy_handle, proposed_pos)) {
+                    enemy->heading = turn_right(enemy->heading);
+                }
+                else {
+                    const Rectangle old_bounds = entity_world_bounds(*enemy);
+                    enemy->world_position = proposed_pos;
+                    const Rectangle new_bounds = entity_world_bounds(*enemy);
+                    spatial_grid_.update(enemy_handle, old_bounds, new_bounds);
+                }
             }
         }
     }

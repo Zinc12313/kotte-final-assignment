@@ -16,11 +16,11 @@ namespace kotte
 
     void Renderer::sort() {
         std::ranges::sort(commands_, [](const RenderCommand& a, const RenderCommand& b) {
-            // 1. Ground layer draws before World layer
+            // Ground layer draws before World layer
             if (a.layer != b.layer) {
                 return a.layer < b.layer;
             }
-            // 2. Smaller depth (higher on screen) draws before larger depth
+            // Smaller depth (higher on screen) draws before larger depth
             return a.depth < b.depth;
             });
     }

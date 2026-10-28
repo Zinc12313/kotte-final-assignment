@@ -36,7 +36,6 @@ namespace kotte
             return false;
         }
 
-        // Vacate slot and advance generation so stale handles are invalidated
         slot.entity.reset();
         ++slot.generation;
         free_slots_.push_back(handle.slot);

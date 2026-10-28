@@ -11,12 +11,13 @@
 
 namespace kotte
 {
-    enum class EntityKind : std::uint8_t {
+    enum class EntityKind {
         player,
-        crate,
         bomb,
+        crate,
+        powerup,
         enemy,
-        powerup
+        enemy_chaser
     };
 
     struct Entity final {
@@ -26,7 +27,7 @@ namespace kotte
         bool alert{ false };
         float fuse_seconds{ 2.0f };
         std::size_t owner_slot{ 0 };
-        float blast_range_tiles{ 3.0f };//range
+        float blast_range_tiles{ 3.0f }; // range
 
         int lives{ 3 };
         bool is_dead{ false };

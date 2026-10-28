@@ -105,6 +105,7 @@
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
     <ClCompile Include="src\camera.cpp" />
+    <ClCompile Include="src\enemy_chaser.cpp" />
     <ClCompile Include="src\entity.cpp" />
     <ClCompile Include="src\entity_store.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -116,6 +117,7 @@
   <ItemGroup>
     <ClInclude Include="include\kotte\application.hpp" />
     <ClInclude Include="include\kotte\camera.hpp" />
+    <ClInclude Include="include\kotte\enemy_chaser.hpp" />
     <ClInclude Include="include\kotte\entity.hpp" />
     <ClInclude Include="include\kotte\entity_store.hpp" />
     <ClInclude Include="include\kotte\random.hpp" />

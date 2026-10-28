@@ -12,6 +12,8 @@ namespace kotte
             return 20.0f;
         case EntityKind::enemy:
             return 28.0f;
+        case EntityKind::enemy_chaser:
+            return 28.0f;
         case EntityKind::powerup:
             return 22.0f;
         }
@@ -27,6 +29,8 @@ namespace kotte
         case EntityKind::bomb:
             return 24.0f;
         case EntityKind::enemy:
+            return 36.0f;
+        case EntityKind::enemy_chaser:
             return 36.0f;
         case EntityKind::powerup:
             return 22.0f;
@@ -44,6 +48,8 @@ namespace kotte
             return 0.8f;
         case EntityKind::enemy:
             return 0.25f;
+        case EntityKind::enemy_chaser:
+            return 0.4f;
         case EntityKind::powerup:
             return 0.5f;
         }
@@ -60,8 +66,10 @@ namespace kotte
             return Color{ 0x30, 0x30, 0x30, 0xff };
         case EntityKind::enemy:
             return Color{ 0xc4, 0x3b, 0x3b, 0xff };
+        case EntityKind::enemy_chaser:
+            return Color{ 0x9b, 0x59, 0xb6, 0xff }; //  for chaser
         case EntityKind::powerup:
-            return Color{ 0x61, 0xaf, 0xef, 0xff }; // Bright Cyan/Blue for powerups
+            return Color{ 0x61, 0xaf, 0xef, 0xff };
         }
         return WHITE;
     }
