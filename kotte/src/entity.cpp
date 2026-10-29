@@ -67,7 +67,7 @@ namespace kotte
         case EntityKind::enemy:
             return Color{ 0xc4, 0x3b, 0x3b, 0xff };
         case EntityKind::enemy_chaser:
-            return Color{ 0x9b, 0x59, 0xb6, 0xff }; //  for chaser
+            return Color{ 0x9b, 0x59, 0xb6, 0xff };
         case EntityKind::powerup:
             return Color{ 0x61, 0xaf, 0xef, 0xff };
         }
@@ -83,12 +83,12 @@ namespace kotte
 
     Rectangle entity_collision_bounds(const Entity& entity) noexcept {
         const float width = entity_width(entity.kind);
-        const float foot_height = (entity.kind == EntityKind::powerup) ? entity_height(entity.kind) : 16.0f;
+        const float height = entity_height(entity.kind);
         return Rectangle{
             entity.world_position.x - (width * 0.5f),
-            entity.world_position.y - foot_height,
+            entity.world_position.y - height,
             width,
-            foot_height
+            height
         };
     }
 } // namespace kotte

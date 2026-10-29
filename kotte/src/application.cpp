@@ -70,12 +70,11 @@ namespace kotte
                     continue;
                 }
 
-                if (std::abs(static_cast<float>(x) * tile_size_ - player_pos.x) < 100.0f &&
-                    std::abs(static_cast<float>(y) * tile_size_ - player_pos.y) < 100.0f) {
+                if (std::abs(static_cast<float>(x) * tile_size_ - player_pos.x) < 80.0f &&
+                    std::abs(static_cast<float>(y) * tile_size_ - player_pos.y) < 80.0f) {
                     continue;
                 }
 
-                // Reduced spawn density (0.08f) for open tactical space and killable enemy counts
                 if (dist_01(random_) < 0.08f) {
                     const float kind_roll = dist_01(random_);
                     EntityKind kind = EntityKind::crate;
@@ -83,7 +82,7 @@ namespace kotte
                         kind = EntityKind::enemy;
                     }
                     else if (kind_roll < 0.08f) {
-                        kind = EntityKind::enemy_chaser; // Spawns chaser enemy
+                        kind = EntityKind::enemy_chaser;
                     }
 
                     const Vector2 pos{
@@ -120,6 +119,7 @@ namespace kotte
         destroy_entity_requests_.clear();
         active_blasts_.clear();
         player_blast_range_tiles_ = 3.0f;
+        player_invulnerable_timer_ = 0.0f;
 
         populate_initial_world();
         round_state_ = RoundState::playing;
@@ -153,6 +153,10 @@ namespace kotte
 
         if (IsKeyPressed(KEY_R)) {
             reset_round();
+        }
+
+        if (player_invulnerable_timer_ > 0.0f) {
+            player_invulnerable_timer_ -= dt;
         }
 
         update_round_state();
@@ -294,9 +298,31 @@ namespace kotte
                     target->fuse_seconds = 0.0f;
                 }
                 else if (target->kind == EntityKind::player) {
-                    target->lives--;
-                    if (target->lives <= 0) {
-                        target->is_dead = true;
+                    if (!target->is_dead && player_invulnerable_timer_ <= 0.0f) {
+                        target->lives--;
+                        if (target->lives <= 0) {
+                            target->is_dead = true;
+                        }
+                        else {
+                            player_invulnerable_timer_ = 1.0f; // 1 second of I-frames
+
+                            // Knockback away from the bomb center
+                            const float dx = target->world_position.x - center.x;
+                            const float dy = target->world_position.y - center.y;
+                            const float dist = std::sqrt((dx * dx) + (dy * dy));
+                            const Vector2 knockback_dir = (dist > 0.001f) ? Vector2{ dx / dist, dy / dist } : Vector2{ 0.0f, 1.0f };
+                            const Vector2 knockback_pos{
+                                target->world_position.x + knockback_dir.x * 45.0f,
+                                target->world_position.y + knockback_dir.y * 45.0f
+                            };
+
+                            if (!entity_movement_is_blocked(player_handle_, knockback_pos)) {
+                                const Rectangle old_bounds = entity_world_bounds(*target);
+                                target->world_position = knockback_pos;
+                                const Rectangle new_bounds = entity_world_bounds(*target);
+                                spatial_grid_.update(player_handle_, old_bounds, new_bounds);
+                            }
+                        }
                     }
                 }
             }
@@ -419,24 +445,37 @@ namespace kotte
 
     void Application::update_enemies(float dt) {
         const Vector2 player_pos = player().world_position;
-        const Rectangle player_bounds = entity_collision_bounds(player());
 
         for (const EntityHandle enemy_handle : enemy_handles_) {
             Entity* enemy = entities_.try_get(enemy_handle);
             if (!enemy) continue;
 
-            // touching an enemy costs 1 
-            if (!player().is_dead && CheckCollisionRecs(player_bounds, entity_collision_bounds(*enemy))) {
+            const float dx = player_pos.x - enemy->world_position.x;
+            const float dy = player_pos.y - enemy->world_position.y;
+            const float dist_sq = (dx * dx) + (dy * dy);
+
+            if (!player().is_dead && player_invulnerable_timer_ <= 0.0f && dist_sq < (30.0f * 30.0f)) {
                 Entity& p = player();
                 p.lives--;
                 if (p.lives <= 0) {
                     p.is_dead = true;
                 }
                 else {
-                    p.world_position = Vector2{
-                        (static_cast<float>(map_.width()) * 0.5f) * tile_size_,
-                        (static_cast<float>(map_.height()) * 0.5f) * tile_size_
+                    player_invulnerable_timer_ = 1.0f;
+
+                    const float dist = std::sqrt(dist_sq);
+                    const Vector2 knockback_dir = (dist > 0.001f) ? Vector2{ dx / dist, dy / dist } : Vector2{ 0.0f, 1.0f };
+                    const Vector2 knockback_pos{
+                        p.world_position.x + knockback_dir.x * 45.0f,
+                        p.world_position.y + knockback_dir.y * 45.0f
                     };
+
+                    if (!entity_movement_is_blocked(player_handle_, knockback_pos)) {
+                        const Rectangle old_bounds = entity_world_bounds(p);
+                        p.world_position = knockback_pos;
+                        const Rectangle new_bounds = entity_world_bounds(p);
+                        spatial_grid_.update(player_handle_, old_bounds, new_bounds);
+                    }
                 }
             }
 
@@ -445,7 +484,6 @@ namespace kotte
                     [this](EntityHandle h, Vector2 pos) { return entity_movement_is_blocked(h, pos); });
             }
             else {
-                // Original Standard Patroller AI
                 constexpr float enemy_speed = 70.0f;
                 const Vector2 to_player{
                     player_pos.x - enemy->world_position.x,
@@ -539,9 +577,14 @@ namespace kotte
                 world_bounds.height
             };
 
-            const Color draw_color = (entity->kind == EntityKind::enemy && entity->alert)
-                ? ORANGE
-                : entity_color(*entity);
+            Color draw_color = entity_color(*entity);
+            if (entity->kind == EntityKind::player && player_invulnerable_timer_ > 0.0f) {
+                int flash = static_cast<int>(player_invulnerable_timer_ * 10.0f) % 2;
+                draw_color = flash == 0 ? WHITE : draw_color;
+            }
+            else if (entity->kind == EntityKind::enemy && entity->alert) {
+                draw_color = ORANGE;
+            }
 
             RenderCommand command{
                 .screen_bounds = screen_bounds,

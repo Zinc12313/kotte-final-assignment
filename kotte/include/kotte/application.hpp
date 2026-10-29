@@ -72,6 +72,7 @@ namespace kotte
         Color background_color_{ 0x18, 0x18, 0x18, 0xff };
         RoundState round_state_{ RoundState::playing };
         float player_blast_range_tiles_{ 3.0f };
+        float player_invulnerable_timer_{ 0.0f };
 
         EntityHandle player_handle_{};
         EntityStore entities_{};
