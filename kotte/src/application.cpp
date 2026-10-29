@@ -75,13 +75,14 @@ namespace kotte
                     continue;
                 }
 
-                if (dist_01(random_) < 0.08f) {
+                // Reduced spawn density to 0.04f for fewer total enemies/crates
+                if (dist_01(random_) < 0.04f) {
                     const float kind_roll = dist_01(random_);
                     EntityKind kind = EntityKind::crate;
-                    if (kind_roll < 0.04f) {
+                    if (kind_roll < 0.02f) {
                         kind = EntityKind::enemy;
                     }
-                    else if (kind_roll < 0.08f) {
+                    else if (kind_roll < 0.04f) {
                         kind = EntityKind::enemy_chaser;
                     }
 
@@ -304,9 +305,8 @@ namespace kotte
                             target->is_dead = true;
                         }
                         else {
-                            player_invulnerable_timer_ = 1.0f; // 1 second of I-frames
+                            player_invulnerable_timer_ = 1.0f;
 
-                            // Knockback away from the bomb center
                             const float dx = target->world_position.x - center.x;
                             const float dy = target->world_position.y - center.y;
                             const float dist = std::sqrt((dx * dx) + (dy * dy));
@@ -562,12 +562,15 @@ namespace kotte
 
         const SpatialQuery spatial_query = spatial_grid_.query(view);
 
+        std::size_t visible_entities_count = 0;
         for (const EntityHandle handle : spatial_query.entity_handles) {
             const Entity* entity = entities_.try_get(handle);
             if (!entity) continue;
 
             const Rectangle world_bounds = entity_world_bounds(*entity);
             if (!CheckCollisionRecs(view, world_bounds)) continue;
+
+            ++visible_entities_count;
 
             const Vector2 screen_top_left = camera_.world_to_screen(Vector2{ world_bounds.x, world_bounds.y });
             const Rectangle screen_bounds{
@@ -600,19 +603,24 @@ namespace kotte
         renderer_.sort();
         renderer_.execute();
 
-        DrawFPS(GetScreenWidth() - 100, 2);
+        const std::size_t total_tiles = static_cast<std::size_t>(map_.width() * map_.height());
+        const float tile_pct = (static_cast<float>(tiles_submitted) / static_cast<float>(total_tiles)) * 100.0f;
+        const std::size_t total_entities = entities_.size();
+        const float entity_pct = total_entities > 0 ? (static_cast<float>(visible_entities_count) / static_cast<float>(total_entities)) * 100.0f : 0.0f;
 
-        std::size_t current_player_bombs = 0;
-        for (const EntityHandle h : active_bomb_handles_) {
-            const Entity* bomb = entities_.try_get(h);
-            if (bomb && bomb->owner_slot == player_handle_.slot) {
-                ++current_player_bombs;
-            }
-        }
+        DrawText(TextFormat("tiles rendered: %zu (%.1f%% of world)", tiles_submitted, tile_pct), 10, 10, 18, LIGHTGRAY);
+        DrawText(TextFormat("entities: %zu visible (%.1f%% of %zu) | %zu visibility tests | %zu commands",
+            visible_entities_count, entity_pct, total_entities, spatial_query.candidate_references, renderer_.command_count()), 10, 32, 18, LIGHTGRAY);
+        DrawText(TextFormat("enemies updated: %zu | active bombs: %zu | blast effects: %zu",
+            enemy_handles_.size(), active_bomb_handles_.size(), active_blasts_.size()), 10, 54, 18, LIGHTGRAY);
+        DrawText(TextFormat("Player Lives: %i | Blast Range: %.0f", player().lives, player_blast_range_tiles_), 10, 76, 18, player().is_dead ? RED : GREEN);
 
-        DrawText(TextFormat("Active Bombs: %zu / 3", current_player_bombs), 10, 10, 20, YELLOW);
-        DrawText(TextFormat("Enemies Remaining: %zu", enemy_handles_.size()), 10, 34, 20, ORANGE);
-        DrawText(TextFormat("Player Lives: %i | Blast Range: %.0f", player().lives, player_blast_range_tiles_), 10, 58, 20, player().is_dead ? RED : GREEN);
+        const int screen_h = window_.height();
+        DrawText(TextFormat("seed: %llu", seed_), 10, screen_h - 75, 16, LIGHTGRAY);
+        DrawText(TextFormat("world: %i x %i tiles | %zu total", map_.width(), map_.height(), total_tiles), 10, screen_h - 55, 16, LIGHTGRAY);
+        DrawText("move: WASD/arrows | bomb: Space | quit: Q/Escape | R: restart", 10, screen_h - 30, 16, YELLOW);
+
+        DrawFPS(window_.width() - 100, 10);
 
         if (round_state_ == RoundState::won) {
             DrawText("VICTORY! ALL ENEMIES DEFEATED", window_.width() / 2 - 200, window_.height() / 2 - 40, 30, GREEN);
@@ -622,8 +630,6 @@ namespace kotte
             DrawText("GAME OVER - DEFEATED", window_.width() / 2 - 150, window_.height() / 2 - 40, 30, RED);
             DrawText("Press [R] to Restart", window_.width() / 2 - 100, window_.height() / 2 + 10, 20, LIGHTGRAY);
         }
-
-        DrawText("WASD: move | Space: place bomb | R: restart | Q: quit", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
     void Application::request_exit() noexcept {
