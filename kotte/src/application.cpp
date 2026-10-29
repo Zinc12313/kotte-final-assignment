@@ -70,19 +70,20 @@ namespace kotte
                     continue;
                 }
 
-                if (std::abs(static_cast<float>(x) * tile_size_ - player_pos.x) < 80.0f &&
-                    std::abs(static_cast<float>(y) * tile_size_ - player_pos.y) < 80.0f) {
+                if (std::abs(static_cast<float>(x) * tile_size_ - player_pos.x) < 100.0f &&
+                    std::abs(static_cast<float>(y) * tile_size_ - player_pos.y) < 100.0f) {
                     continue;
                 }
 
-                if (dist_01(random_) < 0.18f) {
+                // Reduced spawn density (0.08f) for open tactical space and killable enemy counts
+                if (dist_01(random_) < 0.08f) {
                     const float kind_roll = dist_01(random_);
                     EntityKind kind = EntityKind::crate;
-                    if (kind_roll < 0.12f) {
+                    if (kind_roll < 0.04f) {
                         kind = EntityKind::enemy;
                     }
-                    else if (kind_roll < 0.22f) {
-                        kind = EntityKind::enemy_chaser; // Spawns the 2nd behavior chaser
+                    else if (kind_roll < 0.08f) {
+                        kind = EntityKind::enemy_chaser; // Spawns chaser enemy
                     }
 
                     const Vector2 pos{
@@ -418,13 +419,28 @@ namespace kotte
 
     void Application::update_enemies(float dt) {
         const Vector2 player_pos = player().world_position;
+        const Rectangle player_bounds = entity_collision_bounds(player());
 
         for (const EntityHandle enemy_handle : enemy_handles_) {
             Entity* enemy = entities_.try_get(enemy_handle);
             if (!enemy) continue;
 
+            // touching an enemy costs 1 
+            if (!player().is_dead && CheckCollisionRecs(player_bounds, entity_collision_bounds(*enemy))) {
+                Entity& p = player();
+                p.lives--;
+                if (p.lives <= 0) {
+                    p.is_dead = true;
+                }
+                else {
+                    p.world_position = Vector2{
+                        (static_cast<float>(map_.width()) * 0.5f) * tile_size_,
+                        (static_cast<float>(map_.height()) * 0.5f) * tile_size_
+                    };
+                }
+            }
+
             if (enemy->kind == EntityKind::enemy_chaser) {
-                // Extension #9: Chaser Enemy Behavior
                 update_chaser_enemy(dt, enemy_handle, player_pos, spatial_grid_, entities_,
                     [this](EntityHandle h, Vector2 pos) { return entity_movement_is_blocked(h, pos); });
             }
