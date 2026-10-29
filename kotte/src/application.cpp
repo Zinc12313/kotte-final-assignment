@@ -37,7 +37,7 @@ namespace kotte
         int target_fps)
         : window_{ width, height, title, target_fps }
         , random_{ seed }
-        , map_{ make_room(200, 120, random_) }
+        , map_{ make_room(50, 35, random_) }
         , seed_{ seed }
         , camera_{ window_.size() }
         , spatial_grid_{
@@ -75,14 +75,14 @@ namespace kotte
                     continue;
                 }
 
-                // Reduced spawn density to 0.04f for fewer total enemies/crates
-                if (dist_01(random_) < 0.04f) {
+                if (dist_01(random_) < 0.08f) {
                     const float kind_roll = dist_01(random_);
                     EntityKind kind = EntityKind::crate;
-                    if (kind_roll < 0.02f) {
+
+                    if (kind_roll < 0.04f) {
                         kind = EntityKind::enemy;
                     }
-                    else if (kind_roll < 0.04f) {
+                    else if (kind_roll < 0.08f) {
                         kind = EntityKind::enemy_chaser;
                     }
 
@@ -108,7 +108,7 @@ namespace kotte
     }
 
     void Application::reset_round() {
-        map_ = make_room(200, 120, random_);
+        map_ = make_room(50, 35, random_);
 
         spatial_grid_ = SpatialGrid{
             Vector2{ static_cast<float>(map_.width()) * tile_size_, static_cast<float>(map_.height()) * tile_size_ },
