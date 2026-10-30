@@ -1,26 +1,49 @@
-# Kotte
+Kotte - Bomberman World (Final Assignment)
 
-Kotte is a small C++ game engine and teaching project built with [raylib](https://www.raylib.com/).
+A custom Bomberman-style game built on the Kotte C++ game engine and raylib for the Scalable Game Worlds in C++ course at Uppsala University.
 
-It is a work in progress currently being developed for the course [Scalable Game Worlds in C++](https://www.uu.se/en/study/syllabus?query=6751b031-a906-11f0-b7df-f9101f074b4e) at Uppsala University.
+Repository and Submission Links
 
-The project uses C++26, raylib 6.0, and the C++ standard library to explore scalable game architecture and implementation. The current starting point renders a deterministic tile room and deliberately draws every tile, providing a measurable baseline for later camera culling and spatial partitioning.
+Repository URL: https://github.com/Zinc12313/kotte-final-assignment
 
-## Requirements
+Final Commit Link: https://github.com/Zinc12313/kotte-final-assignment/commit/3cb2dde875eaeae9e92227c7cfcf251aa1102849
 
-* Visual Studio Community 2026
-* raylib 6.0
+How to Play and Controls
 
-## Starting point
+Movement: WASD or Arrow Keys
 
-Run the x64 Debug or Release configuration. Move the marker with WASD or the arrow keys, and quit with Q or Escape. The on-screen diagnostics report the fixed world seed and the number of tiles rendered.
+Place Bomb: Spacebar
 
-The initial room uses a contiguous tile map and immediate Raylib drawing. It intentionally does not include a camera, chunks, culling, entity management, collision infrastructure, or a render-command queue; those systems are introduced in response to scaling problems during the course.
+Restart Game: R key
 
-## Random numbers
+Quit Game: Q or Escape
 
-Kotte uses the open-source [`Random<RomuDuoJr>`](https://github.com/ulfben/cpp_prngs) random-number generator. It is fast, compact, easy to seed, deterministic across platforms, compatible with standard-library algorithms, and provides convenient game-oriented operations such as ranges, normalized values, coin flips, and selecting elements from collections.
+Feature Checklist
 
-## Status
+Mandatory Features
 
-Early development. The Week 1 tile-world baseline is in progress.
+Player Damage and Death: Fully implemented health/life system with death states.
+
+Round States: Dynamic Playing, Won, and Lost game states with achievable objectives.
+
+Safe Restart: Clean restart functionality via the R key.
+
+Solid Bombs with Owner Escape: Bombs act as solid obstacles while allowing the player who placed them to safely move away.
+
+Collectible Blast-Range Power-Up: Power-ups spawn upon destroying crates and permanently increase bomb blast radius when collected.
+
+Chosen Extensions
+
+Multiple Bombs per Owner: Players can place up to 3 active bombs simultaneously.
+
+Chain Reactions: Explosions trigger adjacent bombs, causing cascading detonations.
+
+Temporary Invulnerability (I-Frames): Players receive brief invulnerability frames upon taking damage, complete with visual feedback.
+
+Second Enemy Behavior (enemy_chaser): Custom chaser enemy behavior logic implemented alongside standard movement.
+
+Requirements
+
+Visual Studio Community 2026 (compiled at Warning Level 4 /W4 without errors or warnings)
+
+raylib 6.0
